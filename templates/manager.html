@@ -62,37 +62,45 @@
         let rows = [];
 
         function renderTable() {
-                        if (!rows.length && noteType !== 'PRN') {
-                formSection.innerHTML = '<p class="hint">No rows yet.</p>';
+                        if (!rows.length && noteType === 'GRN') {
+                                formSection.innerHTML = `
+                                <div class="stack">
+                                    <h3>Yesterday order (auto-populated)</h3>
+                                    <p class="hint">No GRN rows selected.</p>
+                                    <button id="add-grn-row" class="secondary">Add GRN Row</button>
+                                </div>
+                            `;
+                                bindTableEvents();
                 return;
             }
 
-                        if (!rows.length && noteType === 'PRN') {
-                                formSection.innerHTML = `
+            if (!rows.length && noteType === 'PRN') {
+                formSection.innerHTML = `
                                 <div class="stack">
                                     <h3>Build PRN rows</h3>
                                     <p class="hint">No PRN rows yet.</p>
                                     <button id="add-prn-row" class="secondary">Add PRN Row</button>
                                 </div>
                             `;
-                                bindTableEvents();
-                                return;
-                        }
+                bindTableEvents();
+                return;
+            }
 
             const isGRN = noteType === 'GRN';
             const headerCols = isGRN
-                ? '<th>SKU</th><th>Product</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th>'
+                                ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th><th>Delete</th>'
                 : '<th>SKU</th><th>Return Qty</th><th>Upload Images</th><th>Confirm</th><th>Delete</th>';
 
             const bodyRows = rows.map((row, idx) => {
                 if (isGRN) {
+                                        const skuOptions = skuList.map(sku => `<option value="${sku}" ${row.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
                     return `
             <tr>
-              <td>${row.sku}</td>
-              <td>${row.product}</td>
-              <td>${row.ordered_qty}</td>
+                            <td><select data-field="sku" data-idx="${idx}">${skuOptions}</select></td>
+                            <td><input type="number" min="0" value="${row.ordered_qty || 0}" data-field="ordered_qty" data-idx="${idx}" /></td>
               <td><input type="number" min="0" value="${row.received_qty}" data-field="received_qty" data-idx="${idx}" /></td>
               <td><button class="tiny ${row.confirmed ? 'ok' : ''}" data-action="confirm" data-idx="${idx}">${row.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                            <td><button class="tiny danger" data-action="delete" data-idx="${idx}">Delete</button></td>
             </tr>
           `;
                 }
@@ -113,7 +121,9 @@
         `;
             }).join('');
 
-            const addRowBtn = isGRN ? '' : '<button id="add-prn-row" class="secondary">Add PRN Row</button>';
+            const addRowBtn = isGRN
+                ? '<button id="add-grn-row" class="secondary">Add GRN Row</button>'
+                : '<button id="add-prn-row" class="secondary">Add PRN Row</button>';
 
             formSection.innerHTML = `
         <div class="stack">
@@ -132,7 +142,7 @@
         }
 
         function bindTableEvents() {
-            formSection.querySelectorAll('[data-field="received_qty"], [data-field="return_qty"]').forEach(input => {
+            formSection.querySelectorAll('[data-field="ordered_qty"], [data-field="received_qty"], [data-field="return_qty"]').forEach(input => {
                 input.addEventListener('input', (e) => {
                     const idx = Number(e.target.dataset.idx);
                     const field = e.target.dataset.field;
@@ -186,6 +196,14 @@
             if (addPrnRowBtn) {
                 addPrnRowBtn.addEventListener('click', () => {
                     rows.push({ sku: skuList[0], return_qty: 1, image_name: '', image_preview: '', confirmed: false });
+                    renderTable();
+                });
+            }
+
+            const addGrnRowBtn = document.getElementById('add-grn-row');
+            if (addGrnRowBtn) {
+                addGrnRowBtn.addEventListener('click', () => {
+                    rows.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, image_name: '', confirmed: false });
                     renderTable();
                 });
             }
