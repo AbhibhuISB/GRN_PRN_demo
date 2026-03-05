@@ -28,7 +28,7 @@
             const isGRN = txData.note_type === 'GRN';
             const headers = isGRN
                 ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th>'
-                : '<th>SKU</th><th>Return Qty</th><th>Image</th><th>Confirm</th>';
+                : '<th>SKU</th><th>Return Qty</th><th>Image</th><th>Confirm</th><th>Delete</th>';
 
             const rows = txData.items.map((item, idx) => {
                 if (isGRN) {
@@ -46,8 +46,13 @@
           <tr>
             <td>${item.sku}</td>
             <td><input type="number" min="1" value="${item.return_qty || 1}" data-field="return_qty" data-idx="${idx}" /></td>
-            <td><input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" /><small>${item.image_name || '-'}</small></td>
+                        <td>
+                            <input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
+                            <small>${item.image_name || '-'}</small>
+                            ${item.image_preview ? `<img class="preview-thumb" src="${item.image_preview}" alt="Uploaded image preview" />` : ''}
+                        </td>
             <td><button data-action="confirm" data-idx="${idx}" class="tiny ${item.confirmed ? 'ok' : ''}">${item.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                        <td><button data-action="delete" data-idx="${idx}" class="tiny danger">Delete</button></td>
           </tr>
         `;
             }).join('');
@@ -79,6 +84,7 @@
                     const idx = Number(e.target.dataset.idx);
                     const file = e.target.files?.[0];
                     txData.items[idx].image_name = file ? file.name : '';
+                    txData.items[idx].image_preview = file ? URL.createObjectURL(file) : '';
                     txData.items[idx].confirmed = false;
                     renderTable();
                 });
@@ -88,6 +94,18 @@
                 btn.addEventListener('click', (e) => {
                     const idx = Number(e.target.dataset.idx);
                     txData.items[idx].confirmed = true;
+                    renderTable();
+                });
+            });
+
+            document.querySelectorAll('[data-action="delete"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (txData.items.length <= 1) {
+                        alert('At least one PRN row is required.');
+                        return;
+                    }
+                    const idx = Number(e.target.dataset.idx);
+                    txData.items.splice(idx, 1);
                     renderTable();
                 });
             });

@@ -23,7 +23,10 @@
 
             <div class="stack">
                 <button id="start-scan-btn" class="secondary">Scan QR</button>
+                <button id="stop-scan-btn" class="danger hidden">Stop Scanner</button>
                 <div id="reader" class="hidden"></div>
+                <input id="qr-image-input" type="file" accept="image/*" capture="environment" />
+                <p class="hint">You can allow camera for live scan or capture/upload a QR image.</p>
             </div>
 
             <div class="inline-actions">
@@ -36,9 +39,12 @@
         const txInput = document.getElementById('tx-input');
         const openTxBtn = document.getElementById('open-tx-btn');
         const startScanBtn = document.getElementById('start-scan-btn');
+        const stopScanBtn = document.getElementById('stop-scan-btn');
+        const qrImageInput = document.getElementById('qr-image-input');
         const reader = document.getElementById('reader');
 
         let qrScanner = null;
+        let scannerRunning = false;
 
         function extractTxId(valueRaw) {
             const value = (valueRaw || '').trim();
@@ -71,6 +77,7 @@
         async function startScanner() {
             reader.classList.remove('hidden');
             startScanBtn.disabled = true;
+            stopScanBtn.classList.remove('hidden');
 
             if (!qrScanner) {
                 qrScanner = new Html5Qrcode('reader');
@@ -88,18 +95,60 @@
                             return;
                         }
                         qrScanner.stop().finally(() => {
+                            scannerRunning = false;
                             window.location.href = `/cfa/${txId}`;
                         });
                     }
                 );
+                scannerRunning = true;
             } catch (error) {
                 alert('Camera not available. Please enter transaction ID manually.');
                 startScanBtn.disabled = false;
+                stopScanBtn.classList.add('hidden');
+            }
+        }
+
+        async function stopScanner() {
+            if (!qrScanner || !scannerRunning) {
+                stopScanBtn.classList.add('hidden');
+                startScanBtn.disabled = false;
+                return;
+            }
+
+            await qrScanner.stop();
+            scannerRunning = false;
+            stopScanBtn.classList.add('hidden');
+            startScanBtn.disabled = false;
+        }
+
+        async function scanFromImage(file) {
+            if (!file) {
+                return;
+            }
+
+            if (!qrScanner) {
+                qrScanner = new Html5Qrcode('reader');
+            }
+
+            reader.classList.remove('hidden');
+
+            try {
+                const decodedText = await qrScanner.scanFile(file, true);
+                const txId = extractTxId(decodedText);
+                if (!txId) {
+                    alert('QR detected, but transaction ID not found.');
+                    return;
+                }
+                window.location.href = `/cfa/${txId}`;
+            } catch (error) {
+                alert('Could not read QR from the selected image. Try again.');
             }
         }
 
         openTxBtn.addEventListener('click', () => goToTx(txInput.value));
         startScanBtn.addEventListener('click', startScanner);
+        stopScanBtn.addEventListener('click', stopScanner);
+        qrImageInput.addEventListener('change', (e) => scanFromImage(e.target.files?.[0]));
     </script>
 </body>
 

@@ -240,6 +240,16 @@ a {
     overflow: hidden;
 }
 
+.preview-thumb {
+    display: block;
+    margin-top: 8px;
+    width: 84px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+}
+
 @media (max-width: 900px) {
     .split-grid {
         grid-template-columns: 1fr;

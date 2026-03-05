@@ -15,10 +15,17 @@ TRANSACTIONS: dict[str, dict] = {}
 
 
 YESTERDAY_ORDER = [
-    {"sku": "SKU-APPLE-001", "product": "Apple Crate", "ordered_qty": 20},
-    {"sku": "SKU-BANANA-002", "product": "Banana Box", "ordered_qty": 15},
-    {"sku": "SKU-TOMATO-003", "product": "Tomato Basket", "ordered_qty": 30},
-    {"sku": "SKU-POTATO-004", "product": "Potato Sack", "ordered_qty": 12},
+    {"sku": "buffalo milk 500ml", "product": "buffalo milk 500ml", "ordered_qty": 24},
+    {"sku": "double toned milk 500ml", "product": "double toned milk 500ml", "ordered_qty": 20},
+    {"sku": "toned milk 500ml", "product": "toned milk 500ml", "ordered_qty": 20},
+    {"sku": "cow milk 500ml", "product": "cow milk 500ml", "ordered_qty": 18},
+    {"sku": "curd pouch 480g", "product": "curd pouch 480g", "ordered_qty": 16},
+    {"sku": "cow curd 400g", "product": "cow curd 400g", "ordered_qty": 14},
+    {"sku": "cow curd 1kg", "product": "cow curd 1kg", "ordered_qty": 10},
+    {"sku": "buffalo curd 400g", "product": "buffalo curd 400g", "ordered_qty": 14},
+    {"sku": "buffalo curd 1kg", "product": "buffalo curd 1kg", "ordered_qty": 10},
+    {"sku": "ghee 350g bottle", "product": "ghee 350g bottle", "ordered_qty": 8},
+    {"sku": "ghee 750g pouch", "product": "ghee 750g pouch", "ordered_qty": 6},
 ]
 
 
