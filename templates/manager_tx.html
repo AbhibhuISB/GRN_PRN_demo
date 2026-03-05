@@ -31,6 +31,62 @@
         ];
         let txData = null;
         let hasUnsavedChanges = false;
+        let activeCameraRowIdx = null;
+        let activeCameraStream = null;
+
+        function stopCameraStream() {
+            if (activeCameraStream) {
+                activeCameraStream.getTracks().forEach(track => track.stop());
+                activeCameraStream = null;
+            }
+        }
+
+        function closeCameraPanel() {
+            stopCameraStream();
+            const panel = document.getElementById('camera-panel');
+            if (panel) {
+                panel.classList.add('hidden');
+            }
+            const video = document.getElementById('camera-video');
+            if (video) {
+                video.srcObject = null;
+            }
+            activeCameraRowIdx = null;
+        }
+
+        async function openCameraForRow(idx) {
+            activeCameraRowIdx = idx;
+            const panel = document.getElementById('camera-panel');
+            const video = document.getElementById('camera-video');
+
+            if (!panel || !video) {
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                const fallbackInput = document.querySelector(`[data-field="image"][data-idx="${idx}"]`);
+                if (fallbackInput) {
+                    fallbackInput.click();
+                }
+                return;
+            }
+
+            try {
+                stopCameraStream();
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false,
+                });
+                activeCameraStream = stream;
+                video.srcObject = stream;
+                panel.classList.remove('hidden');
+            } catch (error) {
+                const fallbackInput = document.querySelector(`[data-field="image"][data-idx="${idx}"]`);
+                if (fallbackInput) {
+                    fallbackInput.click();
+                }
+            }
+        }
 
         function getConfirmMeta(row) {
             if (row.confirmed) {
@@ -55,10 +111,10 @@
             const isGRN = txData.note_type === 'GRN';
             const headers = isGRN
                 ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th><th>Delete</th>'
-                                : '<th>SKU</th><th>Return Qty</th><th>Take Picture</th><th>Confirm</th><th>Delete</th>';
+                : '<th>SKU</th><th>Return Qty</th><th>Take Picture</th><th>Confirm</th><th>Delete</th>';
 
             const rows = txData.items.map((item, idx) => {
-                                const confirmMeta = getConfirmMeta(item);
+                const confirmMeta = getConfirmMeta(item);
                 if (isGRN) {
                     const skuOptions = skuList.map(sku => `<option value="${sku}" ${item.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
                     return `
@@ -95,6 +151,7 @@
             <tbody>${rows}</tbody>
           </table>
         </div>
+                                ${!isGRN ? '<div id="camera-panel" class="camera-panel hidden"><video id="camera-video" autoplay playsinline></video><div class="inline-actions"><button id="capture-photo-btn" class="primary" type="button">Capture</button><button id="close-camera-btn" class="danger" type="button">Close Camera</button></div></div>' : ''}
                 ${isGRN ? '<div class="inline-actions"><button id="add-grn-row" class="secondary">Add GRN Row</button></div>' : ''}
       `;
 
@@ -129,12 +186,44 @@
             document.querySelectorAll('[data-action="take-pic"]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const idx = Number(e.target.dataset.idx);
-                    const fileInput = document.querySelector(`[data-field="image"][data-idx="${idx}"]`);
-                    if (fileInput) {
-                        fileInput.click();
-                    }
+                    openCameraForRow(idx);
                 });
             });
+
+            const captureBtn = document.getElementById('capture-photo-btn');
+            if (captureBtn) {
+                captureBtn.addEventListener('click', () => {
+                    if (activeCameraRowIdx === null) {
+                        return;
+                    }
+                    const video = document.getElementById('camera-video');
+                    if (!video || !video.videoWidth) {
+                        return;
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const context = canvas.getContext('2d');
+                    if (!context) {
+                        return;
+                    }
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    markDirty();
+                    txData.items[activeCameraRowIdx].image_preview = canvas.toDataURL('image/jpeg', 0.9);
+                    txData.items[activeCameraRowIdx].image_name = `capture_${Date.now()}.jpg`;
+                    txData.items[activeCameraRowIdx].changed = true;
+                    txData.items[activeCameraRowIdx].confirmed = false;
+                    closeCameraPanel();
+                    renderTable();
+                });
+            }
+
+            const closeCameraBtn = document.getElementById('close-camera-btn');
+            if (closeCameraBtn) {
+                closeCameraBtn.addEventListener('click', () => {
+                    closeCameraPanel();
+                });
+            }
 
             document.querySelectorAll('[data-field="image"]').forEach(fileInput => {
                 fileInput.addEventListener('change', (e) => {
@@ -242,6 +331,8 @@
             if (hasUnsavedChanges) {
                 return;
             }
+
+            closeCameraPanel();
 
             const res = await fetch(`/api/transactions/${txId}`);
             const tx = await res.json();
