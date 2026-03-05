@@ -26,6 +26,8 @@ YESTERDAY_ORDER = [
     {"sku": "buffalo curd 1kg", "product": "buffalo curd 1kg", "ordered_qty": 10},
     {"sku": "ghee 350g bottle", "product": "ghee 350g bottle", "ordered_qty": 8},
     {"sku": "ghee 750g pouch", "product": "ghee 750g pouch", "ordered_qty": 6},
+    {"sku": "200g paneer", "product": "200g paneer", "ordered_qty": 12},
+    {"sku": "200g high protein paneer", "product": "200g high protein paneer", "ordered_qty": 8},
 ]
 
 
