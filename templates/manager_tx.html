@@ -38,6 +38,16 @@
             '200g high protein paneer'
         ];
         let txData = null;
+        let hasUnsavedChanges = false;
+
+        function markDirty() {
+            hasUnsavedChanges = true;
+            const msg = document.getElementById('status-message');
+            if (msg && txData?.status !== 'completed') {
+                msg.className = 'warning';
+                msg.textContent = 'Unsaved edits in progress. Auto-refresh paused until you save and regenerate.';
+            }
+        }
 
         function renderTable() {
             const isGRN = txData.note_type === 'GRN';
@@ -92,6 +102,7 @@
                 input.addEventListener('input', (e) => {
                     const idx = Number(e.target.dataset.idx);
                     const field = e.target.dataset.field;
+                    markDirty();
                     txData.items[idx][field] = Number(e.target.value || 0);
                     txData.items[idx].confirmed = false;
                 });
@@ -100,6 +111,7 @@
             document.querySelectorAll('[data-field="sku"]').forEach(select => {
                 select.addEventListener('change', (e) => {
                     const idx = Number(e.target.dataset.idx);
+                    markDirty();
                     txData.items[idx].sku = e.target.value;
                     txData.items[idx].product = e.target.value;
                     txData.items[idx].confirmed = false;
@@ -110,6 +122,7 @@
                 fileInput.addEventListener('change', (e) => {
                     const idx = Number(e.target.dataset.idx);
                     const file = e.target.files?.[0];
+                    markDirty();
                     txData.items[idx].image_name = file ? file.name : '';
                     txData.items[idx].image_preview = file ? URL.createObjectURL(file) : '';
                     txData.items[idx].confirmed = false;
@@ -120,6 +133,7 @@
             document.querySelectorAll('[data-action="confirm"]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const idx = Number(e.target.dataset.idx);
+                    markDirty();
                     txData.items[idx].confirmed = true;
                     renderTable();
                 });
@@ -132,6 +146,7 @@
                         return;
                     }
                     const idx = Number(e.target.dataset.idx);
+                    markDirty();
                     txData.items.splice(idx, 1);
                     renderTable();
                 });
@@ -140,6 +155,7 @@
             const addGrnRowBtn = document.getElementById('add-grn-row');
             if (addGrnRowBtn) {
                 addGrnRowBtn.addEventListener('click', () => {
+                    markDirty();
                     txData.items.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, confirmed: false, image_name: '' });
                     renderTable();
                 });
@@ -166,6 +182,7 @@
                 alert(updated.error || 'Unable to update transaction');
                 return;
             }
+            hasUnsavedChanges = false;
             txData = updated;
 
             const qrRes = await fetch(`/api/transactions/${txId}/generate-qr`, { method: 'POST' });
@@ -202,6 +219,10 @@
         }
 
         async function loadTransaction() {
+            if (hasUnsavedChanges) {
+                return;
+            }
+
             const res = await fetch(`/api/transactions/${txId}`);
             const tx = await res.json();
             if (!res.ok) {
@@ -210,6 +231,7 @@
             }
 
             txData = tx;
+            hasUnsavedChanges = false;
             document.getElementById('tx-header').textContent = `${tx.tx_id} | ${tx.note_type} | status: ${tx.status}`;
             renderTable();
             renderActions();
