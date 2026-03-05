@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CFA Validation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+    <main class="container">
+        <section class="card">
+            <h1>CFA Interface</h1>
+            <p class="hint">Scan result for transaction <strong>{{ tx_id }}</strong></p>
+            <div id="receipt"></div>
+
+            <div class="stack">
+                <label class="label" for="dispute-note">Optional dispute note</label>
+                <textarea id="dispute-note" rows="3" placeholder="Mention mismatch details..."></textarea>
+            </div>
+
+            <div class="inline-actions">
+                <button id="accept-btn" class="primary">Accept & Acknowledge</button>
+                <button id="dispute-btn" class="danger">Dispute Numbers</button>
+            </div>
+
+            <div id="result" class="hidden"></div>
+        </section>
+    </main>
+
+    <script>
+        const txId = "{{ tx_id }}";
+        const receipt = document.getElementById('receipt');
+        const result = document.getElementById('result');
+
+        function renderRows(items, noteType) {
+            const headers = noteType === 'GRN'
+                ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th>'
+                : '<th>SKU</th><th>Return Qty</th><th>Image</th>';
+
+            const body = items.map(item => {
+                if (noteType === 'GRN') {
+                    return `<tr><td>${item.sku}</td><td>${item.ordered_qty || 0}</td><td>${item.received_qty || 0}</td></tr>`;
+                }
+                return `<tr><td>${item.sku}</td><td>${item.return_qty || 0}</td><td>${item.image_name || '-'}</td></tr>`;
+            }).join('');
+
+            return `
+        <div class="table-wrap">
+          <table>
+            <thead><tr>${headers}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+        }
+
+        async function loadTransaction() {
+            const res = await fetch(`/api/transactions/${txId}`);
+            const tx = await res.json();
+            if (!res.ok) {
+                receipt.innerHTML = `<p>${tx.error || 'Transaction not found'}</p>`;
+                return;
+            }
+
+            receipt.innerHTML = `
+        <div class="stack">
+          <p><strong>${tx.tx_id}</strong> | ${tx.note_type} | status: ${tx.status}</p>
+          ${renderRows(tx.items, tx.note_type)}
+        </div>
+      `;
+        }
+
+        async function submitDecision(decision) {
+            const note = document.getElementById('dispute-note').value.trim();
+            const res = await fetch(`/api/transactions/${txId}/cfa-decision`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision, note })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Unable to submit decision');
+                return;
+            }
+
+            result.classList.remove('hidden');
+            result.className = decision === 'accept' ? 'success' : 'warning';
+            result.textContent = decision === 'accept'
+                ? 'Transaction completed acknowledgement submitted.'
+                : 'Dispute submitted. Store manager can edit and regenerate QR.';
+
+            loadTransaction();
+        }
+
+        document.getElementById('accept-btn').addEventListener('click', () => submitDecision('accept'));
+        document.getElementById('dispute-btn').addEventListener('click', () => submitDecision('dispute'));
+
+        loadTransaction();
+    </script>
+</body>
+
+</html>

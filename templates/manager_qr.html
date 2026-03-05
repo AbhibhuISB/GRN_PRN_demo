@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager QR Screen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+    <main class="container">
+        <section class="card center stack">
+            <h1>QR Generated</h1>
+            <p class="hint">Transaction <strong id="tx-id">{{ tx_id }}</strong></p>
+            <div id="qrcode" class="center-box"></div>
+            <p><a id="join-url" href="#" target="_blank"></a></p>
+            <div class="meta center-meta">
+                <span>Status: <strong id="tx-status">loading...</strong></span>
+                <span>CFA Note: <strong id="cfa-note">-</strong></span>
+            </div>
+            <div id="done-msg" class="success hidden">Transaction completed acknowledgement received.</div>
+            <div id="dispute-msg" class="warning hidden"></div>
+            <div class="inline-actions center-actions">
+                <a class="secondary link-btn" href="/">Back to launcher</a>
+                <a id="edit-link" class="primary link-btn hidden" href="#">Open Edit & Regenerate</a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const txId = "{{ tx_id }}";
+        const joinUrl = `${window.location.origin}/join/${txId}`;
+
+        const statusEl = document.getElementById('tx-status');
+        const noteEl = document.getElementById('cfa-note');
+        const doneMsg = document.getElementById('done-msg');
+        const disputeMsg = document.getElementById('dispute-msg');
+        const editLink = document.getElementById('edit-link');
+
+        function renderQr() {
+            document.getElementById('join-url').href = joinUrl;
+            document.getElementById('join-url').textContent = joinUrl;
+            new QRCode(document.getElementById('qrcode'), {
+                text: joinUrl,
+                width: 240,
+                height: 240,
+            });
+        }
+
+        async function refreshStatus() {
+            const res = await fetch(`/api/transactions/${txId}`);
+            const tx = await res.json();
+            if (!res.ok) {
+                statusEl.textContent = tx.error || 'not found';
+                return;
+            }
+
+            statusEl.textContent = tx.status;
+            noteEl.textContent = tx.cfa_note || '-';
+
+            doneMsg.classList.add('hidden');
+            disputeMsg.classList.add('hidden');
+            editLink.classList.add('hidden');
+
+            if (tx.status === 'completed') {
+                doneMsg.classList.remove('hidden');
+            }
+
+            if (tx.status === 'disputed') {
+                disputeMsg.textContent = `Disputed by CFA: ${tx.cfa_note || 'No note'}`;
+                disputeMsg.classList.remove('hidden');
+                editLink.href = `/manager-tx/${txId}`;
+                editLink.classList.remove('hidden');
+            }
+        }
+
+        renderQr();
+        refreshStatus();
+        setInterval(refreshStatus, 2500);
+    </script>
+</body>
+
+</html>

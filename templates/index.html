@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sid's Farm Demo Launcher</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+    <main class="container">
+        <section class="card center">
+            <h1>Sid's Farm Demo</h1>
+            <p>Order acknowledgement demo (GRN / PRN) with QR-based CFA validation.</p>
+        </section>
+
+        <section class="split-grid">
+            <div class="card center stack">
+                <h2>Start as Store Manager</h2>
+                <button id="create-manager-btn" class="primary">Create Store Manager Session</button>
+                <p class="hint">Each click creates a separate manager session for multi-manager demo testing.</p>
+            </div>
+
+            <div class="card stack">
+                <h2>Join Existing Transaction</h2>
+                <p class="hint">Paste transaction ID (example: tx_ab12cd34) or full QR link.</p>
+                <input id="join-input" type="text" placeholder="tx_ab12cd34 or https://.../join/tx_ab12cd34" />
+                <div class="inline-actions">
+                    <button id="join-cfa-btn" class="primary">Join as CFA</button>
+                    <button id="join-manager-btn" class="secondary">Join as Store Manager</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const createBtn = document.getElementById('create-manager-btn');
+        const joinInput = document.getElementById('join-input');
+        const joinCfaBtn = document.getElementById('join-cfa-btn');
+        const joinManagerBtn = document.getElementById('join-manager-btn');
+
+        function extractTxId(rawValue) {
+            const value = (rawValue || '').trim();
+            if (!value) return '';
+
+            if (value.startsWith('tx_')) {
+                return value;
+            }
+
+            const joinMatch = value.match(/\/join\/(tx_[A-Za-z0-9]+)/);
+            if (joinMatch?.[1]) {
+                return joinMatch[1];
+            }
+
+            const managerQrMatch = value.match(/\/manager-qr\/(tx_[A-Za-z0-9]+)/);
+            if (managerQrMatch?.[1]) {
+                return managerQrMatch[1];
+            }
+
+            return '';
+        }
+
+        function goToRole(role) {
+            const txId = extractTxId(joinInput.value);
+            if (!txId) {
+                alert('Enter a valid transaction ID or QR join link');
+                return;
+            }
+
+            if (role === 'cfa') {
+                window.location.href = `/cfa/${txId}`;
+                return;
+            }
+
+            window.location.href = `/manager-tx/${txId}`;
+        }
+
+        createBtn.addEventListener('click', async () => {
+            createBtn.disabled = true;
+            try {
+                const res = await fetch('/api/managers', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.error || 'Unable to create manager session');
+                    createBtn.disabled = false;
+                    return;
+                }
+                window.location.href = `/manager/${data.manager_id}`;
+            } catch (error) {
+                alert('Failed to create session');
+                createBtn.disabled = false;
+            }
+        });
+
+        joinCfaBtn.addEventListener('click', () => goToRole('cfa'));
+        joinManagerBtn.addEventListener('click', () => goToRole('manager'));
+    </script>
+</body>
+
+</html>

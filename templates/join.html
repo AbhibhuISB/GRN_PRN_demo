@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Join Transaction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+    <main class="container">
+        <section class="card center">
+            <h1>Scanned QR</h1>
+            <p id="tx-summary">Loading transaction...</p>
+            <div class="inline-actions">
+                <a id="cfa-link" class="primary link-btn" href="#">Continue as CFA</a>
+                <a id="manager-link" class="secondary link-btn" href="#">Continue as Store Manager</a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const txId = "{{ tx_id }}";
+
+        async function init() {
+            const res = await fetch(`/api/transactions/${txId}`);
+            const data = await res.json();
+            const summary = document.getElementById('tx-summary');
+            if (!res.ok) {
+                summary.textContent = data.error || 'Transaction not found';
+                return;
+            }
+
+            summary.textContent = `Transaction ${data.tx_id} | ${data.note_type} | status: ${data.status}`;
+            document.getElementById('cfa-link').href = `/cfa/${txId}`;
+            document.getElementById('manager-link').href = `/manager-tx/${txId}`;
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

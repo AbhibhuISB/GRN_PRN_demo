@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Store Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+    <main class="container">
+        <section class="card">
+            <div class="row-between">
+                <h1>Store Manager Interface</h1>
+                <span class="badge">{{ manager_id }}</span>
+            </div>
+
+            <div class="stack">
+                <label class="label">Select flow</label>
+                <div class="inline-actions">
+                    <button id="flow-grn" class="secondary">Goods Received Note (GRN)</button>
+                    <button id="flow-prn" class="secondary">Product Return Note (PRN)</button>
+                </div>
+            </div>
+
+            <div id="form-section" class="hidden"></div>
+            <div id="final-actions" class="inline-actions hidden">
+                <button id="final-confirm-btn" class="primary">Final Confirmation</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Recent Transactions</h2>
+            <div id="tx-list" class="stack small"></div>
+        </section>
+    </main>
+
+    <script>
+        const managerId = "{{ manager_id }}";
+        const skuList = [
+            'SKU-APPLE-001',
+            'SKU-BANANA-002',
+            'SKU-TOMATO-003',
+            'SKU-POTATO-004',
+            'SKU-ONION-005',
+            'SKU-CARROT-006'
+        ];
+
+        const formSection = document.getElementById('form-section');
+        const finalActions = document.getElementById('final-actions');
+        const finalConfirmBtn = document.getElementById('final-confirm-btn');
+
+        let noteType = null;
+        let rows = [];
+
+        function renderTable() {
+            if (!rows.length) {
+                formSection.innerHTML = '<p class="hint">No rows yet.</p>';
+                return;
+            }
+
+            const isGRN = noteType === 'GRN';
+            const headerCols = isGRN
+                ? '<th>SKU</th><th>Product</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th>'
+                : '<th>SKU</th><th>Return Qty</th><th>Upload Images</th><th>Confirm</th>';
+
+            const bodyRows = rows.map((row, idx) => {
+                if (isGRN) {
+                    return `
+            <tr>
+              <td>${row.sku}</td>
+              <td>${row.product}</td>
+              <td>${row.ordered_qty}</td>
+              <td><input type="number" min="0" value="${row.received_qty}" data-field="received_qty" data-idx="${idx}" /></td>
+              <td><button class="tiny ${row.confirmed ? 'ok' : ''}" data-action="confirm" data-idx="${idx}">${row.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+            </tr>
+          `;
+                }
+
+                const skuOptions = skuList.map(sku => `<option value="${sku}" ${row.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
+                return `
+          <tr>
+            <td><select data-field="sku" data-idx="${idx}">${skuOptions}</select></td>
+            <td><input type="number" min="1" value="${row.return_qty || 1}" data-field="return_qty" data-idx="${idx}" /></td>
+            <td>
+              <input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
+              <small>${row.image_name || 'No image selected'}</small>
+            </td>
+            <td><button class="tiny ${row.confirmed ? 'ok' : ''}" data-action="confirm" data-idx="${idx}">${row.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+          </tr>
+        `;
+            }).join('');
+
+            const addRowBtn = isGRN ? '' : '<button id="add-prn-row" class="secondary">Add PRN Row</button>';
+
+            formSection.innerHTML = `
+        <div class="stack">
+          <h3>${isGRN ? 'Yesterday order (auto-populated)' : 'Build PRN rows'}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>${headerCols}</tr></thead>
+              <tbody>${bodyRows}</tbody>
+            </table>
+          </div>
+          ${addRowBtn}
+        </div>
+      `;
+
+            bindTableEvents();
+        }
+
+        function bindTableEvents() {
+            formSection.querySelectorAll('[data-field="received_qty"], [data-field="return_qty"]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const field = e.target.dataset.field;
+                    rows[idx][field] = Number(e.target.value || 0);
+                    rows[idx].confirmed = false;
+                });
+            });
+
+            formSection.querySelectorAll('[data-field="sku"]').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    rows[idx].sku = e.target.value;
+                    rows[idx].confirmed = false;
+                });
+            });
+
+            formSection.querySelectorAll('[data-field="image"]').forEach(fileInput => {
+                fileInput.addEventListener('change', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const file = e.target.files?.[0];
+                    rows[idx].image_name = file ? file.name : '';
+                    rows[idx].confirmed = false;
+                    renderTable();
+                });
+            });
+
+            formSection.querySelectorAll('[data-action="confirm"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    if (noteType === 'PRN') {
+                        if (!rows[idx].sku || !rows[idx].return_qty) {
+                            alert('Select SKU and quantity before confirming row');
+                            return;
+                        }
+                    }
+                    rows[idx].confirmed = true;
+                    renderTable();
+                });
+            });
+
+            const addPrnRowBtn = document.getElementById('add-prn-row');
+            if (addPrnRowBtn) {
+                addPrnRowBtn.addEventListener('click', () => {
+                    rows.push({ sku: skuList[0], return_qty: 1, image_name: '', confirmed: false });
+                    renderTable();
+                });
+            }
+        }
+
+        function allRowsConfirmed() {
+            return rows.length > 0 && rows.every(r => r.confirmed);
+        }
+
+        async function startGRN() {
+            noteType = 'GRN';
+            const res = await fetch(`/api/managers/${managerId}/yesterday-order`);
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Unable to fetch yesterday order');
+                return;
+            }
+            rows = data.items;
+            formSection.classList.remove('hidden');
+            finalActions.classList.remove('hidden');
+            renderTable();
+        }
+
+        function startPRN() {
+            noteType = 'PRN';
+            rows = [{ sku: skuList[0], return_qty: 1, image_name: '', confirmed: false }];
+            formSection.classList.remove('hidden');
+            finalActions.classList.remove('hidden');
+            renderTable();
+        }
+
+        function shapeRowsForApi() {
+            return rows.map(row => ({
+                sku: row.sku,
+                product: row.product || '',
+                ordered_qty: Number(row.ordered_qty || 0),
+                received_qty: Number(row.received_qty || 0),
+                return_qty: Number(row.return_qty || 0),
+                image_name: row.image_name || '',
+                confirmed: !!row.confirmed
+            }));
+        }
+
+        async function finalConfirm() {
+            if (!noteType) {
+                alert('Select GRN or PRN first');
+                return;
+            }
+
+            if (!allRowsConfirmed()) {
+                alert('Confirm all rows before final confirmation');
+                return;
+            }
+
+            finalConfirmBtn.disabled = true;
+            finalConfirmBtn.textContent = 'Submitting...';
+
+            const payload = {
+                manager_id: managerId,
+                note_type: noteType,
+                items: shapeRowsForApi()
+            };
+
+            const createRes = await fetch('/api/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const tx = await createRes.json();
+            if (!createRes.ok) {
+                alert(tx.error || 'Failed to create transaction');
+                finalConfirmBtn.disabled = false;
+                finalConfirmBtn.textContent = 'Final Confirmation';
+                return;
+            }
+
+            const qrRes = await fetch(`/api/transactions/${tx.tx_id}/generate-qr`, { method: 'POST' });
+            const qrData = await qrRes.json();
+            if (!qrRes.ok) {
+                alert(qrData.error || 'Failed to generate QR');
+                finalConfirmBtn.disabled = false;
+                finalConfirmBtn.textContent = 'Final Confirmation';
+                return;
+            }
+
+            window.location.href = `/manager-qr/${tx.tx_id}`;
+        }
+
+        async function loadTransactions() {
+            const res = await fetch(`/api/managers/${managerId}`);
+            const data = await res.json();
+            const txList = document.getElementById('tx-list');
+            if (!res.ok) {
+                txList.innerHTML = `<p class="hint">${data.error || 'Unable to fetch transactions'}</p>`;
+                return;
+            }
+
+            if (!data.transactions.length) {
+                txList.innerHTML = '<p class="hint">No transactions yet.</p>';
+                return;
+            }
+
+            txList.innerHTML = data.transactions.map(tx => `
+        <div class="tx-item">
+          <div><strong>${tx.tx_id}</strong> | ${tx.note_type} | status: ${tx.status}</div>
+          <a href="/manager-tx/${tx.tx_id}" target="_blank">Open</a>
+        </div>
+      `).join('');
+        }
+
+        document.getElementById('flow-grn').addEventListener('click', startGRN);
+        document.getElementById('flow-prn').addEventListener('click', startPRN);
+        finalConfirmBtn.addEventListener('click', finalConfirm);
+
+        loadTransactions();
+    </script>
+</body>
+
+</html>

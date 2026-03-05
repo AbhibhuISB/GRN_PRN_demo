@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager Transaction View</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+    <main class="container">
+        <section class="card">
+            <h1>Store Manager - Transaction</h1>
+            <p id="tx-header" class="hint">Loading...</p>
+            <div id="table-zone"></div>
+
+            <div class="inline-actions" id="edit-actions"></div>
+            <div id="status-message"></div>
+            <div id="qr-zone" class="hidden"></div>
+        </section>
+    </main>
+
+    <script>
+        const txId = "{{ tx_id }}";
+        let txData = null;
+
+        function renderTable() {
+            const isGRN = txData.note_type === 'GRN';
+            const headers = isGRN
+                ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th>'
+                : '<th>SKU</th><th>Return Qty</th><th>Image</th><th>Confirm</th>';
+
+            const rows = txData.items.map((item, idx) => {
+                if (isGRN) {
+                    return `
+            <tr>
+              <td>${item.sku}</td>
+              <td>${item.ordered_qty || 0}</td>
+              <td><input type="number" min="0" value="${item.received_qty || 0}" data-field="received_qty" data-idx="${idx}" /></td>
+              <td><button data-action="confirm" data-idx="${idx}" class="tiny ${item.confirmed ? 'ok' : ''}">${item.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+            </tr>
+          `;
+                }
+
+                return `
+          <tr>
+            <td>${item.sku}</td>
+            <td><input type="number" min="1" value="${item.return_qty || 1}" data-field="return_qty" data-idx="${idx}" /></td>
+            <td><input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" /><small>${item.image_name || '-'}</small></td>
+            <td><button data-action="confirm" data-idx="${idx}" class="tiny ${item.confirmed ? 'ok' : ''}">${item.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+          </tr>
+        `;
+            }).join('');
+
+            document.getElementById('table-zone').innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead><tr>${headers}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+
+            bindTableEvents();
+        }
+
+        function bindTableEvents() {
+            document.querySelectorAll('[data-field="received_qty"], [data-field="return_qty"]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const field = e.target.dataset.field;
+                    txData.items[idx][field] = Number(e.target.value || 0);
+                    txData.items[idx].confirmed = false;
+                });
+            });
+
+            document.querySelectorAll('[data-field="image"]').forEach(fileInput => {
+                fileInput.addEventListener('change', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const file = e.target.files?.[0];
+                    txData.items[idx].image_name = file ? file.name : '';
+                    txData.items[idx].confirmed = false;
+                    renderTable();
+                });
+            });
+
+            document.querySelectorAll('[data-action="confirm"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    txData.items[idx].confirmed = true;
+                    renderTable();
+                });
+            });
+        }
+
+        function allRowsConfirmed() {
+            return txData.items.length && txData.items.every(item => item.confirmed);
+        }
+
+        async function saveAndRegenerate() {
+            if (!allRowsConfirmed()) {
+                alert('Confirm all rows before regenerating QR');
+                return;
+            }
+
+            const updateRes = await fetch(`/api/transactions/${txId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: txData.items })
+            });
+            const updated = await updateRes.json();
+            if (!updateRes.ok) {
+                alert(updated.error || 'Unable to update transaction');
+                return;
+            }
+            txData = updated;
+
+            const qrRes = await fetch(`/api/transactions/${txId}/generate-qr`, { method: 'POST' });
+            const qrData = await qrRes.json();
+            if (!qrRes.ok) {
+                alert(qrData.error || 'Unable to regenerate QR');
+                return;
+            }
+
+            renderQr(qrData.join_url);
+            await loadTransaction();
+        }
+
+        function renderQr(joinUrl) {
+            const zone = document.getElementById('qr-zone');
+            zone.classList.remove('hidden');
+            zone.innerHTML = `
+        <h3>QR (Latest)</h3>
+        <div id="qrcode"></div>
+        <p><a href="${joinUrl}" target="_blank">${joinUrl}</a></p>
+      `;
+            new QRCode(document.getElementById('qrcode'), {
+                text: joinUrl,
+                width: 220,
+                height: 220
+            });
+        }
+
+        function renderActions() {
+            const actions = document.getElementById('edit-actions');
+            const msg = document.getElementById('status-message');
+
+            if (txData.status === 'completed') {
+                actions.innerHTML = '';
+                msg.className = 'success';
+                msg.textContent = 'Transaction completed acknowledgement received.';
+                return;
+            }
+
+            if (txData.status === 'disputed') {
+                msg.className = 'warning';
+                msg.textContent = `Disputed by CFA: ${txData.cfa_note || 'No note'}`;
+            } else {
+                msg.className = 'hint';
+                msg.textContent = txData.cfa_note ? `CFA note: ${txData.cfa_note}` : '';
+            }
+
+            actions.innerHTML = '<button id="regen-btn" class="primary">Save Changes & Regenerate QR</button>';
+            document.getElementById('regen-btn').addEventListener('click', saveAndRegenerate);
+        }
+
+        async function loadTransaction() {
+            const res = await fetch(`/api/transactions/${txId}`);
+            const tx = await res.json();
+            if (!res.ok) {
+                document.getElementById('tx-header').textContent = tx.error || 'Transaction not found';
+                return;
+            }
+
+            txData = tx;
+            document.getElementById('tx-header').textContent = `${tx.tx_id} | ${tx.note_type} | status: ${tx.status}`;
+            renderTable();
+            renderActions();
+
+            if (tx.status === 'qr_generated' || tx.status === 'disputed') {
+                const joinUrl = `${window.location.origin}/join/${tx.tx_id}`;
+                renderQr(joinUrl);
+            }
+        }
+
+        loadTransaction();
+        setInterval(loadTransaction, 2500);
+    </script>
+</body>
+
+</html>
