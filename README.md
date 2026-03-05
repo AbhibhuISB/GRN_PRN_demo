@@ -50,6 +50,25 @@ This is a demo-only web app to present the paper-to-online order acknowledgement
 4. Render will detect [render.yaml](render.yaml) and create a free web service.
 5. Wait for deploy, then open the generated Render URL.
 
+### Render click-by-click (recommended)
+
+1. Log in to Render dashboard.
+2. Click **New +** (top-right).
+3. Click **Blueprint**.
+4. Connect GitHub account (if prompted).
+5. Select repo: **GRN_PRN_demo**.
+6. Keep branch as **main**.
+7. Click **Apply** / **Create Blueprint Instance**.
+8. Wait for build + deploy to complete.
+9. Open service URL shown by Render.
+
+Expected Render settings (auto-read from [render.yaml](render.yaml)):
+- Type: Web Service
+- Environment: Python
+- Plan: Free
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app`
+
 Alternative (without Blueprint):
 - Create **Web Service** from repo.
 - Build command: `pip install -r requirements.txt`
@@ -58,3 +77,8 @@ Alternative (without Blueprint):
 Free tier note:
 - Render free plans are typically available but can change over time.
 - Free services may sleep after inactivity and take a few seconds to wake.
+
+If first deploy fails:
+- Check **Logs** in Render service page.
+- Confirm repo root contains [app.py](app.py), [requirements.txt](requirements.txt), and [render.yaml](render.yaml).
+- Click **Manual Deploy** -> **Deploy latest commit** after fixing issues.
