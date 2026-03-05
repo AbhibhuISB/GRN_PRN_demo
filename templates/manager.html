@@ -40,18 +40,10 @@
         const managerId = "{{ manager_id }}";
         const skuList = [
             'buffalo milk 500ml',
-            'double toned milk 500ml',
-            'toned milk 500ml',
             'cow milk 500ml',
             'curd pouch 480g',
-            'cow curd 400g',
-            'cow curd 1kg',
             'buffalo curd 400g',
-            'buffalo curd 1kg',
-            'ghee 350g bottle',
-            'ghee 750g pouch',
-            '200g paneer',
-            '200g high protein paneer'
+            'paneer 200g'
         ];
 
         const formSection = document.getElementById('form-section');
@@ -61,16 +53,26 @@
         let noteType = null;
         let rows = [];
 
+        function getConfirmMeta(row) {
+            if (row.confirmed) {
+                return { label: 'Confirmed', className: 'ok' };
+            }
+            if (row.changed) {
+                return { label: 'Value changed', className: 'warn' };
+            }
+            return { label: 'Confirm', className: 'warn' };
+        }
+
         function renderTable() {
-                        if (!rows.length && noteType === 'GRN') {
-                                formSection.innerHTML = `
+            if (!rows.length && noteType === 'GRN') {
+                formSection.innerHTML = `
                                 <div class="stack">
                                     <h3>Yesterday order (auto-populated)</h3>
                                     <p class="hint">No GRN rows selected.</p>
                                     <button id="add-grn-row" class="secondary">Add GRN Row</button>
                                 </div>
                             `;
-                                bindTableEvents();
+                bindTableEvents();
                 return;
             }
 
@@ -89,17 +91,18 @@
             const isGRN = noteType === 'GRN';
             const headerCols = isGRN
                                 ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th><th>Delete</th>'
-                : '<th>SKU</th><th>Return Qty</th><th>Upload Images</th><th>Confirm</th><th>Delete</th>';
+                                : '<th>SKU</th><th>Return Qty</th><th>Take Picture</th><th>Confirm</th><th>Delete</th>';
 
             const bodyRows = rows.map((row, idx) => {
+                                const confirmMeta = getConfirmMeta(row);
                 if (isGRN) {
-                                        const skuOptions = skuList.map(sku => `<option value="${sku}" ${row.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
+                    const skuOptions = skuList.map(sku => `<option value="${sku}" ${row.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
                     return `
             <tr>
                             <td><select data-field="sku" data-idx="${idx}">${skuOptions}</select></td>
                             <td><input type="number" min="0" value="${row.ordered_qty || 0}" data-field="ordered_qty" data-idx="${idx}" /></td>
               <td><input type="number" min="0" value="${row.received_qty}" data-field="received_qty" data-idx="${idx}" /></td>
-              <td><button class="tiny ${row.confirmed ? 'ok' : ''}" data-action="confirm" data-idx="${idx}">${row.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                            <td><button class="tiny ${confirmMeta.className}" data-action="confirm" data-idx="${idx}">${confirmMeta.label}</button></td>
                             <td><button class="tiny danger" data-action="delete" data-idx="${idx}">Delete</button></td>
             </tr>
           `;
@@ -111,11 +114,12 @@
             <td><select data-field="sku" data-idx="${idx}">${skuOptions}</select></td>
             <td><input type="number" min="1" value="${row.return_qty || 1}" data-field="return_qty" data-idx="${idx}" /></td>
             <td>
-              <input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
+                            <button class="tiny secondary" data-action="take-pic" data-idx="${idx}">Take Picture</button>
+                            <input class="hidden" type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
                             <small>${row.image_name || 'No image selected'}</small>
                             ${row.image_preview ? `<img class="preview-thumb" src="${row.image_preview}" alt="Uploaded image preview" />` : ''}
             </td>
-            <td><button class="tiny ${row.confirmed ? 'ok' : ''}" data-action="confirm" data-idx="${idx}">${row.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                        <td><button class="tiny ${confirmMeta.className}" data-action="confirm" data-idx="${idx}">${confirmMeta.label}</button></td>
                         <td><button class="tiny danger" data-action="delete" data-idx="${idx}">Delete</button></td>
           </tr>
         `;
@@ -147,7 +151,9 @@
                     const idx = Number(e.target.dataset.idx);
                     const field = e.target.dataset.field;
                     rows[idx][field] = Number(e.target.value || 0);
+                    rows[idx].changed = true;
                     rows[idx].confirmed = false;
+                    renderTable();
                 });
             });
 
@@ -155,7 +161,20 @@
                 select.addEventListener('change', (e) => {
                     const idx = Number(e.target.dataset.idx);
                     rows[idx].sku = e.target.value;
+                    rows[idx].product = e.target.value;
+                    rows[idx].changed = true;
                     rows[idx].confirmed = false;
+                    renderTable();
+                });
+            });
+
+            formSection.querySelectorAll('[data-action="take-pic"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const fileInput = formSection.querySelector(`[data-field="image"][data-idx="${idx}"]`);
+                    if (fileInput) {
+                        fileInput.click();
+                    }
                 });
             });
 
@@ -165,6 +184,7 @@
                     const file = e.target.files?.[0];
                     rows[idx].image_name = file ? file.name : '';
                     rows[idx].image_preview = file ? URL.createObjectURL(file) : '';
+                    rows[idx].changed = true;
                     rows[idx].confirmed = false;
                     renderTable();
                 });
@@ -180,6 +200,7 @@
                         }
                     }
                     rows[idx].confirmed = true;
+                    rows[idx].changed = false;
                     renderTable();
                 });
             });
@@ -195,7 +216,7 @@
             const addPrnRowBtn = document.getElementById('add-prn-row');
             if (addPrnRowBtn) {
                 addPrnRowBtn.addEventListener('click', () => {
-                    rows.push({ sku: skuList[0], return_qty: 1, image_name: '', image_preview: '', confirmed: false });
+                    rows.push({ sku: skuList[0], return_qty: 1, image_name: '', image_preview: '', confirmed: false, changed: false });
                     renderTable();
                 });
             }
@@ -203,7 +224,7 @@
             const addGrnRowBtn = document.getElementById('add-grn-row');
             if (addGrnRowBtn) {
                 addGrnRowBtn.addEventListener('click', () => {
-                    rows.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, image_name: '', confirmed: false });
+                    rows.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, image_name: '', confirmed: false, changed: false });
                     renderTable();
                 });
             }
@@ -221,7 +242,7 @@
                 alert(data.error || 'Unable to fetch yesterday order');
                 return;
             }
-            rows = data.items;
+            rows = data.items.map(row => ({ ...row, changed: false }));
             formSection.classList.remove('hidden');
             finalActions.classList.remove('hidden');
             renderTable();
@@ -229,7 +250,7 @@
 
         function startPRN() {
             noteType = 'PRN';
-            rows = [{ sku: skuList[0], return_qty: 1, image_name: '', image_preview: '', confirmed: false }];
+            rows = [{ sku: skuList[0], return_qty: 1, image_name: '', image_preview: '', confirmed: false, changed: false }];
             formSection.classList.remove('hidden');
             finalActions.classList.remove('hidden');
             renderTable();

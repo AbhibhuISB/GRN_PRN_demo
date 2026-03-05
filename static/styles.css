@@ -138,6 +138,11 @@ button:disabled {
     background: var(--ok) !important;
 }
 
+.warn {
+    background: var(--warn) !important;
+    color: #fff;
+}
+
 .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--line);

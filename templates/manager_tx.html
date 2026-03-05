@@ -24,21 +24,23 @@
         const txId = "{{ tx_id }}";
         const skuList = [
             'buffalo milk 500ml',
-            'double toned milk 500ml',
-            'toned milk 500ml',
             'cow milk 500ml',
             'curd pouch 480g',
-            'cow curd 400g',
-            'cow curd 1kg',
             'buffalo curd 400g',
-            'buffalo curd 1kg',
-            'ghee 350g bottle',
-            'ghee 750g pouch',
-            '200g paneer',
-            '200g high protein paneer'
+            'paneer 200g'
         ];
         let txData = null;
         let hasUnsavedChanges = false;
+
+        function getConfirmMeta(row) {
+            if (row.confirmed) {
+                return { label: 'Confirmed', className: 'ok' };
+            }
+            if (row.changed) {
+                return { label: 'Value changed', className: 'warn' };
+            }
+            return { label: 'Confirm', className: 'warn' };
+        }
 
         function markDirty() {
             hasUnsavedChanges = true;
@@ -53,9 +55,10 @@
             const isGRN = txData.note_type === 'GRN';
             const headers = isGRN
                 ? '<th>SKU</th><th>Ordered Qty</th><th>Received Qty</th><th>Confirm</th><th>Delete</th>'
-                : '<th>SKU</th><th>Return Qty</th><th>Image</th><th>Confirm</th><th>Delete</th>';
+                                : '<th>SKU</th><th>Return Qty</th><th>Take Picture</th><th>Confirm</th><th>Delete</th>';
 
             const rows = txData.items.map((item, idx) => {
+                                const confirmMeta = getConfirmMeta(item);
                 if (isGRN) {
                     const skuOptions = skuList.map(sku => `<option value="${sku}" ${item.sku === sku ? 'selected' : ''}>${sku}</option>`).join('');
                     return `
@@ -63,7 +66,7 @@
               <td><select data-field="sku" data-idx="${idx}">${skuOptions}</select></td>
               <td><input type="number" min="0" value="${item.ordered_qty || 0}" data-field="ordered_qty" data-idx="${idx}" /></td>
               <td><input type="number" min="0" value="${item.received_qty || 0}" data-field="received_qty" data-idx="${idx}" /></td>
-              <td><button data-action="confirm" data-idx="${idx}" class="tiny ${item.confirmed ? 'ok' : ''}">${item.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                            <td><button data-action="confirm" data-idx="${idx}" class="tiny ${confirmMeta.className}">${confirmMeta.label}</button></td>
               <td><button data-action="delete" data-idx="${idx}" class="tiny danger">Delete</button></td>
             </tr>
           `;
@@ -74,11 +77,12 @@
             <td>${item.sku}</td>
             <td><input type="number" min="1" value="${item.return_qty || 1}" data-field="return_qty" data-idx="${idx}" /></td>
                         <td>
-                            <input type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
+                                                        <button class="tiny secondary" data-action="take-pic" data-idx="${idx}">Take Picture</button>
+                                                        <input class="hidden" type="file" accept="image/*" capture="environment" data-field="image" data-idx="${idx}" />
                             <small>${item.image_name || '-'}</small>
                             ${item.image_preview ? `<img class="preview-thumb" src="${item.image_preview}" alt="Uploaded image preview" />` : ''}
                         </td>
-            <td><button data-action="confirm" data-idx="${idx}" class="tiny ${item.confirmed ? 'ok' : ''}">${item.confirmed ? 'Confirmed' : 'Confirm row'}</button></td>
+                        <td><button data-action="confirm" data-idx="${idx}" class="tiny ${confirmMeta.className}">${confirmMeta.label}</button></td>
                         <td><button data-action="delete" data-idx="${idx}" class="tiny danger">Delete</button></td>
           </tr>
         `;
@@ -104,7 +108,9 @@
                     const field = e.target.dataset.field;
                     markDirty();
                     txData.items[idx][field] = Number(e.target.value || 0);
+                    txData.items[idx].changed = true;
                     txData.items[idx].confirmed = false;
+                    renderTable();
                 });
             });
 
@@ -114,7 +120,19 @@
                     markDirty();
                     txData.items[idx].sku = e.target.value;
                     txData.items[idx].product = e.target.value;
+                    txData.items[idx].changed = true;
                     txData.items[idx].confirmed = false;
+                    renderTable();
+                });
+            });
+
+            document.querySelectorAll('[data-action="take-pic"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = Number(e.target.dataset.idx);
+                    const fileInput = document.querySelector(`[data-field="image"][data-idx="${idx}"]`);
+                    if (fileInput) {
+                        fileInput.click();
+                    }
                 });
             });
 
@@ -125,6 +143,7 @@
                     markDirty();
                     txData.items[idx].image_name = file ? file.name : '';
                     txData.items[idx].image_preview = file ? URL.createObjectURL(file) : '';
+                    txData.items[idx].changed = true;
                     txData.items[idx].confirmed = false;
                     renderTable();
                 });
@@ -135,6 +154,7 @@
                     const idx = Number(e.target.dataset.idx);
                     markDirty();
                     txData.items[idx].confirmed = true;
+                    txData.items[idx].changed = false;
                     renderTable();
                 });
             });
@@ -156,7 +176,7 @@
             if (addGrnRowBtn) {
                 addGrnRowBtn.addEventListener('click', () => {
                     markDirty();
-                    txData.items.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, confirmed: false, image_name: '' });
+                    txData.items.push({ sku: skuList[0], product: skuList[0], ordered_qty: 0, received_qty: 0, confirmed: false, changed: false, image_name: '' });
                     renderTable();
                 });
             }
@@ -231,6 +251,7 @@
             }
 
             txData = tx;
+            txData.items = txData.items.map(item => ({ ...item, changed: false }));
             hasUnsavedChanges = false;
             document.getElementById('tx-header').textContent = `${tx.tx_id} | ${tx.note_type} | status: ${tx.status}`;
             renderTable();
