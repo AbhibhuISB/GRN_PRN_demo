@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import os
+import random
 from uuid import uuid4
 
 from flask import Flask, jsonify, render_template, request, url_for
@@ -29,6 +30,14 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:8]}"
 
 
+def _new_tx_id() -> str:
+    for _ in range(30):
+        tx_id = f"{random.randint(0, 99999):05d}"
+        if tx_id not in TRANSACTIONS:
+            return tx_id
+    return f"{random.randint(0, 99999):05d}"
+
+
 @app.route("/")
 def launcher():
     return render_template("index.html")
@@ -47,6 +56,11 @@ def join_page(tx_id: str):
 @app.route("/cfa/<tx_id>")
 def cfa_page(tx_id: str):
     return render_template("cfa.html", tx_id=tx_id)
+
+
+@app.route("/cfa-entry")
+def cfa_entry_page():
+    return render_template("cfa_entry.html")
 
 
 @app.route("/manager-tx/<tx_id>")
@@ -128,7 +142,7 @@ def create_transaction():
     if not items:
         return jsonify({"error": "At least one row is required"}), 400
 
-    tx_id = _new_id("tx")
+    tx_id = _new_tx_id()
     tx = {
         "tx_id": tx_id,
         "manager_id": manager_id,

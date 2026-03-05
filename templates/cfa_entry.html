@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CFA Entry</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+
+<body>
+    <main class="container">
+        <section class="card stack">
+            <h1>CFA Entry</h1>
+            <p class="hint">Enter transaction ID (5 digits) or scan QR.</p>
+
+            <div class="stack">
+                <label class="label" for="tx-input">Transaction ID / Link</label>
+                <input id="tx-input" type="text" placeholder="e.g. 48392 or full /join URL" />
+                <button id="open-tx-btn" class="primary">Open Transaction</button>
+            </div>
+
+            <div class="stack">
+                <button id="start-scan-btn" class="secondary">Scan QR</button>
+                <div id="reader" class="hidden"></div>
+            </div>
+
+            <div class="inline-actions">
+                <a class="secondary link-btn" href="/">Back to Home</a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const txInput = document.getElementById('tx-input');
+        const openTxBtn = document.getElementById('open-tx-btn');
+        const startScanBtn = document.getElementById('start-scan-btn');
+        const reader = document.getElementById('reader');
+
+        let qrScanner = null;
+
+        function extractTxId(valueRaw) {
+            const value = (valueRaw || '').trim();
+            if (!value) return '';
+
+            const onlyDigits = value.match(/^\d{5}$/);
+            if (onlyDigits) return value;
+
+            const joinMatch = value.match(/\/join\/(\d{5})/);
+            if (joinMatch?.[1]) return joinMatch[1];
+
+            const managerQrMatch = value.match(/\/manager-qr\/(\d{5})/);
+            if (managerQrMatch?.[1]) return managerQrMatch[1];
+
+            const cfaMatch = value.match(/\/cfa\/(\d{5})/);
+            if (cfaMatch?.[1]) return cfaMatch[1];
+
+            return '';
+        }
+
+        function goToTx(rawValue) {
+            const txId = extractTxId(rawValue);
+            if (!txId) {
+                alert('Enter a valid 5-digit transaction ID or a valid QR link');
+                return;
+            }
+            window.location.href = `/cfa/${txId}`;
+        }
+
+        async function startScanner() {
+            reader.classList.remove('hidden');
+            startScanBtn.disabled = true;
+
+            if (!qrScanner) {
+                qrScanner = new Html5Qrcode('reader');
+            }
+
+            const config = { fps: 10, qrbox: 220 };
+
+            try {
+                await qrScanner.start(
+                    { facingMode: 'environment' },
+                    config,
+                    (decodedText) => {
+                        const txId = extractTxId(decodedText);
+                        if (!txId) {
+                            return;
+                        }
+                        qrScanner.stop().finally(() => {
+                            window.location.href = `/cfa/${txId}`;
+                        });
+                    }
+                );
+            } catch (error) {
+                alert('Camera not available. Please enter transaction ID manually.');
+                startScanBtn.disabled = false;
+            }
+        }
+
+        openTxBtn.addEventListener('click', () => goToTx(txInput.value));
+        startScanBtn.addEventListener('click', startScanner);
+    </script>
+</body>
+
+</html>

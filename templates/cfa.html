@@ -33,6 +33,7 @@
         const txId = "{{ tx_id }}";
         const receipt = document.getElementById('receipt');
         const result = document.getElementById('result');
+        let countdownTimer = null;
 
         function renderRows(items, noteType) {
             const headers = noteType === 'GRN'
@@ -74,6 +75,12 @@
 
         async function submitDecision(decision) {
             const note = document.getElementById('dispute-note').value.trim();
+            const acceptBtn = document.getElementById('accept-btn');
+            const disputeBtn = document.getElementById('dispute-btn');
+
+            acceptBtn.disabled = true;
+            disputeBtn.disabled = true;
+
             const res = await fetch(`/api/transactions/${txId}/cfa-decision`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -82,16 +89,32 @@
             const data = await res.json();
             if (!res.ok) {
                 alert(data.error || 'Unable to submit decision');
+                acceptBtn.disabled = false;
+                disputeBtn.disabled = false;
                 return;
             }
 
             result.classList.remove('hidden');
             result.className = decision === 'accept' ? 'success' : 'warning';
-            result.textContent = decision === 'accept'
-                ? 'Transaction completed acknowledgement submitted.'
-                : 'Dispute submitted. Store manager can edit and regenerate QR.';
+            if (decision === 'accept') {
+                result.textContent = 'Transaction completed acknowledgement submitted.';
+                loadTransaction();
+                return;
+            }
 
-            loadTransaction();
+            let secondsLeft = 5;
+            result.textContent = `Dispute submitted. Redirecting in ${secondsLeft}...`;
+            clearInterval(countdownTimer);
+            countdownTimer = setInterval(() => {
+                secondsLeft -= 1;
+                if (secondsLeft <= 0) {
+                    clearInterval(countdownTimer);
+                    window.location.href = '/';
+                    return;
+                }
+                result.textContent = `Dispute submitted. Redirecting in ${secondsLeft}...`;
+            }, 1000);
+
         }
 
         document.getElementById('accept-btn').addEventListener('click', () => submitDecision('accept'));

@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Manager Transaction View</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
@@ -18,7 +17,6 @@
 
             <div class="inline-actions" id="edit-actions"></div>
             <div id="status-message"></div>
-            <div id="qr-zone" class="hidden"></div>
         </section>
     </main>
 
@@ -124,23 +122,7 @@
                 return;
             }
 
-            renderQr(qrData.join_url);
-            await loadTransaction();
-        }
-
-        function renderQr(joinUrl) {
-            const zone = document.getElementById('qr-zone');
-            zone.classList.remove('hidden');
-            zone.innerHTML = `
-        <h3>QR (Latest)</h3>
-        <div id="qrcode"></div>
-        <p><a href="${joinUrl}" target="_blank">${joinUrl}</a></p>
-      `;
-            new QRCode(document.getElementById('qrcode'), {
-                text: joinUrl,
-                width: 220,
-                height: 220
-            });
+            window.location.href = `/manager-qr/${txId}`;
         }
 
         function renderActions() {
@@ -179,10 +161,6 @@
             renderTable();
             renderActions();
 
-            if (tx.status === 'qr_generated' || tx.status === 'disputed') {
-                const joinUrl = `${window.location.origin}/join/${tx.tx_id}`;
-                renderQr(joinUrl);
-            }
         }
 
         loadTransaction();

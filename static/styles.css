@@ -231,6 +231,15 @@ a {
     justify-content: center;
 }
 
+#reader {
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
 @media (max-width: 900px) {
     .split-grid {
         grid-template-columns: 1fr;
